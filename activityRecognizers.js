@@ -2,11 +2,13 @@ var url = require('url')
 
 
 function longest(steps, count){
-  steps.sort(
+  return steps.concat().sort(
     (a,b) => (b[1]-b[0])-(a[1]-a[0])
   ).slice(0,count)
 }
 
+
+// TODO: indirect should not count subdomains
 
 export default {
   indirect: {
@@ -17,8 +19,8 @@ export default {
     describe(steps, trail){
       let topTitles = longest(steps, 3).map(s => s[4]).join(', ')
       return {
-        was: "looking at links off of",
-        details: topTitles
+        verbPhrase: "visiting links",
+        examples: topTitles
       }
     }
   },
@@ -30,8 +32,8 @@ export default {
     describe(steps, trail){
       let topTitles = longest(steps, 3).map(s => s[4]).join(', ')
       return {
-        was: "using",
-        details: topTitles
+        verbPhrase: "using the site",
+        examples: topTitles
       }
     }
   }

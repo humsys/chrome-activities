@@ -6,36 +6,54 @@ let IGNORE_ACTIVITIES_BELOW_THRESHOLD = 5*MINUTES
 
 export default {
 
-  monitorActivities(onActivity){
-    Trails.monitorTrails(onActivity && (trail => {
-      console.log('got trail', trail)
-      let topActivity = this.topActivities([trail], 3000)[0]
-      console.log('posting top activitie', topActivity)
-      onActivity(topActivity)
-    }))
+  trackActivities(){
+    Trails.trackUsageTrails()
   },
 
-  topActivities(trails, minimumLength) {
-    if (!trails) trails = Trails.mostSignificantTrails()
-    if (!minimumLength) minimumLength = IGNORE_ACTIVITIES_BELOW_THRESHOLD
-    var activities = []
-    trails.forEach(x => {
-      this.addRecognizedActivities(activities, x, minimumLength)
+  onActivityChanged(cb){
+    Trails.onTrailChanged(trail => {
+      // console.log('got trail', trail)
+      cb(this.activitiesForTrail(trail)[0])
     })
-    return activities.sort( (a,b) => b.elapsed - a.elapsed )
   },
 
-  hideActivity(a){
+  forReview(minimumLength) {
+    console.log('asking for top activities')
+    return Trails.mostSignificantTrails().then(ary => {
+      console.log('got top trails', ary)
+      var activities = []
+      ary.forEach(x => {
+        this.addRecognizedActivities(activities, x, minimumLength)
+      })
+      return activities.sort( (a,b) => b.elapsed - a.elapsed )
+    })
+  },
+
+  wasReviewed(a){
     Trails.markTrailSteps(a.trailId, a.steps, a.recognizer)
   },
 
 
   // PRIVATE
 
+  activitiesForTrail(t){
+    let result = []
+    this.addRecognizedActivities(result, t)
+    return result.sort( (a,b) => b.elapsed - a.elapsed )
+  },
+
   addRecognizedActivities(ary, trail, minimumLength){
+    if (!minimumLength) minimumLength = IGNORE_ACTIVITIES_BELOW_THRESHOLD
     var remainingSteps = [].concat(trail.steps)
     for (var k in recognizers){
-      let subset = recognizers[k].filter(trail.steps, trail)
+      let rec = recognizers[k]
+      var subset, desc = ""
+      try {
+        subset = rec.filter(remainingSteps, trail)
+        if (subset && subset.length) desc = rec.describe(subset, trail)
+      } catch (e){
+        console.log('recognizer failed', k, e)
+      }
       remainingSteps = remainingSteps.filter( i => subset.indexOf(i) < 0 )
       var totalElapsed = 0
       subset.forEach(s => totalElapsed += s[1] - s[0])
@@ -43,10 +61,14 @@ export default {
         // activities must have: trailId, whichSteps, elapsed, and id
         ary.push({
           trailId: trail.ctime,
+          blame: trail.blameUrl,
+          favIconUrl: trail.favIconUrl,
           steps: subset,
           elapsed: totalElapsed,
+          over: [subset[0][0], subset[subset.length-1][1]],
           recognizer: k,
-          desc: recognizers[k].describe(subset, trail)
+          verbPhrase: desc.verbPhrase,
+          examples: desc.examples
         })
       }
     }

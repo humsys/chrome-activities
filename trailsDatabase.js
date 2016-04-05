@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import monitorUsage from './monitorUsage'
+import Usage from './usage'
 
 let db = new Dexie("ChromeActivities")
 
@@ -12,33 +12,44 @@ let TRAILS_SEALED_AFTER = 1*DAYS
 
 let activeTrails = {} // blameUrl: {ctime, mtime}
 
-db.version(1).stores({
-  trails: "ctime,unmarked,total"
-  // mtime, blameUrl
-  // steps: [[t0,t1,activityId,url,title]]
-})
+db.version(1).stores({ trails: "ctime,unmarked,total" })
+// var exampleTrail = {
+//   blameUrl:
+//   ctime:
+//   mtime:
+//   unmarked:
+//   total:
+//   steps: [[t0,t1,activityId,url,title]]
+// }
 
 
 
 
 export default {
 
-  monitorTrails(onTrailActive){
-    monitorUsage(this.postUsage, onTrailActive && (tabInfo => {
-      if (activeTrails[tabInfo.blame]){
-        let ctime = activeTrails[tabInfo.blame].ctime
-        db.trails.get(ctime).then(onTrailActive)
+  trackUsageTrails(){
+    this.initActiveTrailsList()
+    Usage.onNewUsage(this.postUsage)
+  },
+
+  onTrailChanged(cb){
+    Usage.onBlameChanged(blame => {
+      if (activeTrails[blame]){
+        let ctime = activeTrails[blame].ctime
+        db.trails.get(ctime).then(cb)
       }
-    }))
+    })
   },
 
   mostSignificantTrails(max_age){
     if (!max_age) max_age = 4*WEEKS
-    pruneOldAndTinyTrails()
+    let now = Date.now()
+
+    this.pruneOldAndTinyTrails()
 
     return db.trails.orderBy('unmarked').reverse().limit(100).and(x => {
-      return now - x.mtime < max_age
-    })
+      return x.blameUrl && now - x.mtime < max_age
+    }).toArray().catch(err => console.log('top trail error', err))
   },
 
   markTrailSteps(trailId, whichSteps, mark){
@@ -57,13 +68,22 @@ export default {
 
   // PRIVATE
 
+  initActiveTrailsList(){
+    let four_days_ago = Date.now() - 4*DAYS
+    db.trails.where('ctime').above(four_days_ago).each(t => {
+      if (t.mtime > Date.now() - TRAILS_SEALED_AFTER){
+        activeTrails[t.blameUrl] = { mtime: t.mtime, ctime: t.ctime }
+      }
+    })
+  },
+
   pruneOldAndTinyTrails(){
     db.trails.where('total').below(IGNORE_TRAILS_BELOW_THRESHOLD).and(x => {
       return now - x.mtime > TRAILS_SEALED_AFTER
     }).delete()
   },
 
-  postUsage(blameUrl, url, title, elapsed){
+  postUsage(blameUrl, url, title, elapsed, favIconUrl){
     if (elapsed < IGNORE_USAGES_BELOW_THRESHOLD) return
     if (!blameUrl) return
 
@@ -74,7 +94,7 @@ export default {
     )
 
     if (!active){
-      console.log('new trail', blameUrl, url, title, elapsed)
+      console.log('new trail', blameUrl, url, title, elapsed, favIconUrl)
       activeTrails[blameUrl] = { mtime: now, ctime: now }
       db.trails.put({
         blameUrl: blameUrl,
@@ -82,11 +102,12 @@ export default {
         mtime: now,
         unmarked: elapsed,
         total: elapsed,
+        favIconUrl: favIconUrl,
         steps: [ [t0,now,null,url,title] ]
       })
 
     } else {
-      console.log('trail continued', blameUrl, url, title, elapsed)
+      console.log('trail continued', blameUrl, url, title, elapsed, favIconUrl)
       activeTrails[blameUrl].mtime = now
       let ctime = activeTrails[blameUrl].ctime
       db.trails.where(":id").equals(ctime).modify(trail => {
