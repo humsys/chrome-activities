@@ -33,6 +33,7 @@ function flush(){
 }
 
 function checkIfCurrentTabBlameChanged(){
+  if (!currentTabId || !tabs[currentTabId]) return;
   let currentBlame = tabs[currentTabId].blame
   if (previousBlame != currentBlame){
     blameChangedListeners.forEach(l => l(currentBlame))
