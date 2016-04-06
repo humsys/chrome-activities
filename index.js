@@ -1,7 +1,7 @@
 import Trails from './trailsDatabase'
 import recognizers from './activityRecognizers'
 let MINUTES = 60*1000
-let IGNORE_ACTIVITIES_BELOW_THRESHOLD = 5*MINUTES
+let IGNORE_ACTIVITIES_BELOW_THRESHOLD = 2*MINUTES
 
 
 export default {
