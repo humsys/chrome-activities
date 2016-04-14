@@ -78,6 +78,7 @@ export default {
   },
 
   pruneOldAndTinyTrails(){
+    let now = Date.now()
     db.trails.where('total').below(IGNORE_TRAILS_BELOW_THRESHOLD).and(x => {
       return now - x.mtime > TRAILS_SEALED_AFTER
     }).delete()
