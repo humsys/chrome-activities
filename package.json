@@ -1,6 +1,6 @@
 {
   "name": "chrome-activities",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "repository": "livable/chrome-activities",
   "description": "parses your chrome history into reviewable activities",
   "main": "index.js",

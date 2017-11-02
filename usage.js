@@ -9,6 +9,8 @@ var onNewUsageHandler = null
 var isRunning = false
 var previousBlame = null
 
+Object.values = function(o){return Object.keys(o).map(function(k){return o[k]})};
+
 
 function userInitiatedTransition(prevUrl, newUrl, transitionType){
   if (transitionType.match(userInitiated)) return true
